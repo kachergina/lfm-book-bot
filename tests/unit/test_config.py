@@ -1,9 +1,10 @@
 """Tests for configuration management."""
 
 import os
+import ssl
 from unittest.mock import patch
 
-from bot.config import Settings, get_settings, normalize_database_url
+from bot.config import Settings, get_settings, normalize_database_url, prepare_asyncpg_url
 
 
 class TestSettings:
@@ -82,6 +83,72 @@ class TestNormalizeDatabaseUrl:
         with patch.dict(os.environ, env_vars, clear=False):
             settings = Settings()
             assert settings.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
+
+
+class TestPrepareAsyncpgUrl:
+    """Regression tests for Neon/libpq URL params with asyncpg."""
+
+    _neon_base = (
+        "postgresql://user:pass@ep-example-pooler.us-east-1.aws.neon.tech/neondb"
+    )
+
+    def test_neon_sslmode_require_stripped_and_mapped(self) -> None:
+        """sslmode=require must not reach asyncpg.connect() as sslmode."""
+        url, connect_args = prepare_asyncpg_url(f"{self._neon_base}?sslmode=require")
+        assert url == (
+            "postgresql+asyncpg://user:pass@ep-example-pooler.us-east-1.aws.neon.tech/neondb"
+        )
+        assert connect_args == {"ssl": True}
+        assert "sslmode" not in url
+
+    def test_sslmode_disable(self) -> None:
+        """sslmode=disable maps to ssl=False."""
+        _, connect_args = prepare_asyncpg_url(
+            "postgresql://user:pass@host:5432/db?sslmode=disable"
+        )
+        assert connect_args == {"ssl": False}
+
+    def test_sslmode_verify_full_uses_ssl_context(self) -> None:
+        """sslmode=verify-full maps to an SSLContext."""
+        _, connect_args = prepare_asyncpg_url(
+            "postgresql://user:pass@host:5432/db?sslmode=verify-full"
+        )
+        assert isinstance(connect_args["ssl"], ssl.SSLContext)
+
+    def test_libpq_only_params_stripped(self) -> None:
+        """Unsupported libpq params are removed from the engine URL."""
+        raw = (
+            "postgresql://user:pass@host:5432/db"
+            "?sslmode=require&channel_binding=require&sslrootcert=system"
+        )
+        url, connect_args = prepare_asyncpg_url(raw)
+        assert "sslmode" not in url
+        assert "channel_binding" not in url
+        assert "sslrootcert" not in url
+        assert connect_args == {"ssl": True}
+
+    def test_other_query_params_preserved(self) -> None:
+        """Non-libpq query params unrelated to SSL are kept."""
+        url, connect_args = prepare_asyncpg_url(
+            "postgresql://user:pass@host:5432/db?sslmode=require&application_name=books_bot"
+        )
+        assert url.endswith("application_name=books_bot")
+        assert connect_args == {"ssl": True}
+
+    def test_sqlite_unchanged(self) -> None:
+        """Local SQLite URLs are not modified."""
+        url = "sqlite+aiosqlite:///./data/bot.db"
+        assert prepare_asyncpg_url(url) == (url, {})
+
+    def test_settings_neon_database_url(self) -> None:
+        """Settings accepts Neon DATABASE_URL with sslmode=require."""
+        env_vars = {
+            "TELEGRAM_BOT_TOKEN": "test-token",
+            "DATABASE_URL": f"{self._neon_base}?sslmode=require",
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            settings = Settings()
+            assert settings.database_url == f"{self._neon_base.replace('postgresql://', 'postgresql+asyncpg://')}?sslmode=require"
 
 
 class TestGetSettings:

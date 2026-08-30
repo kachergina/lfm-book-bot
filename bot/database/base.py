@@ -5,6 +5,8 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
+from bot.config import prepare_asyncpg_url
+
 
 class Base(DeclarativeBase):
     """SQLAlchemy declarative base for all models."""
@@ -23,7 +25,8 @@ def init_engine(database_url: str, echo: bool = False) -> None:
         echo: Whether to echo SQL statements.
     """
     global engine, async_session_factory
-    engine = create_async_engine(database_url, echo=echo)
+    url, connect_args = prepare_asyncpg_url(database_url)
+    engine = create_async_engine(url, echo=echo, connect_args=connect_args)
     async_session_factory = async_sessionmaker(
         engine,
         class_=AsyncSession,

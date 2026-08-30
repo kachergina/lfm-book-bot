@@ -1,7 +1,34 @@
 """Application configuration management."""
 
+import ssl
+from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# libpq query params passed through by SQLAlchemy but not supported by asyncpg
+_LIBPQ_QUERY_PARAMS = frozenset(
+    {
+        "sslcert",
+        "sslkey",
+        "sslrootcert",
+        "sslcrl",
+        "sslcompression",
+        "channel_binding",
+        "gssencmode",
+    }
+)
+
+
+def _asyncpg_ssl_from_sslmode(sslmode: str) -> bool | ssl.SSLContext:
+    """Map libpq sslmode to asyncpg's ssl connect argument."""
+    mode = sslmode.lower()
+    if mode == "disable":
+        return False
+    if mode in ("verify-ca", "verify-full"):
+        return ssl.create_default_context()
+    return True
 
 
 def normalize_database_url(url: str) -> str:
@@ -22,6 +49,43 @@ def normalize_database_url(url: str) -> str:
     if url.startswith("postgresql://"):
         return "postgresql+asyncpg://" + url.removeprefix("postgresql://")
     return url
+
+
+def prepare_asyncpg_url(url: str) -> tuple[str, dict[str, Any]]:
+    """Prepare a database URL and connect_args for create_async_engine.
+
+    Neon and similar hosts append libpq ``sslmode`` to ``DATABASE_URL``. SQLAlchemy
+    forwards query parameters to asyncpg.connect(), which does not accept
+    ``sslmode``. This function strips unsupported params and maps ``sslmode`` to
+    asyncpg's ``ssl`` argument.
+
+    Args:
+        url: Database URL (raw or already normalized).
+
+    Returns:
+        Tuple of (engine URL, connect_args). SQLite URLs return empty connect_args.
+    """
+    url = normalize_database_url(url)
+    if url.startswith("sqlite"):
+        return url, {}
+
+    parsed = urlparse(url)
+    if "+asyncpg" not in parsed.scheme:
+        return url, {}
+
+    connect_args: dict[str, Any] = {}
+    kept_params: list[tuple[str, str]] = []
+
+    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+        if key == "sslmode":
+            connect_args["ssl"] = _asyncpg_ssl_from_sslmode(value)
+        elif key in _LIBPQ_QUERY_PARAMS:
+            continue
+        else:
+            kept_params.append((key, value))
+
+    cleaned = urlunparse(parsed._replace(query=urlencode(kept_params)))
+    return cleaned, connect_args
 
 
 class Settings(BaseSettings):

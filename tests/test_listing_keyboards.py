@@ -91,9 +91,10 @@ class TestListingKeyboards:
         keyboard = get_listing_manage_keyboard(1, "active")
         assert keyboard is not None
         # Should have edit buttons + reserve + sell + archive + back
-        assert len(keyboard.inline_keyboard) >= 7
+        assert len(keyboard.inline_keyboard) >= 8
         # Check reserve button exists
         callbacks = [btn.callback_data for row in keyboard.inline_keyboard for btn in row]
+        assert "ml:1:edit_photos" in callbacks
         assert "ml:1:reserve" in callbacks
         assert "ml:1:sell" in callbacks
         assert "ml:1:archive" in callbacks

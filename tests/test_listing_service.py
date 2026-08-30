@@ -181,6 +181,35 @@ class TestListingServiceStatusTransitions:
         assert updated.reserved_at is not None
 
     @pytest.mark.asyncio
+    async def test_active_to_sold(
+        self,
+        db_session: AsyncSession,
+        academic_year: AcademicYear,
+        user: User,
+    ):
+        """Test transitioning from active directly to sold."""
+        book_repo = BookRepository(db_session)
+        book = await book_repo.create(
+            category="textbook",
+            title="Math 6eme",
+            catalog_year_id=academic_year.id,
+        )
+        await db_session.commit()
+
+        service = ListingService(db_session)
+        listing = await service.create_listing(
+            book_id=book.id,
+            seller_id=user.id,
+            price=Decimal("15.00"),
+            condition="good",
+            phone="0612345678",
+        )
+
+        updated = await service.update_status(listing.id, user.id, "sold")
+        assert updated.status == "sold"
+        assert updated.sold_at is not None
+
+    @pytest.mark.asyncio
     async def test_reserved_to_sold(
         self,
         db_session: AsyncSession,

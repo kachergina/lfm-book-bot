@@ -102,6 +102,19 @@ async def handle_sell_category(
 
     category = callback.data.split(":")[2]
     await state.update_data(category=category)
+
+    if category == "other":
+        await state.set_state(SellFlow.entering_custom_title)
+        from bot.keyboards.catalog import get_custom_title_keyboard
+
+        await _edit_message(
+            callback,
+            fr.SELL_ENTER_CUSTOM_TITLE,
+            reply_markup=get_custom_title_keyboard(),
+        )
+        await callback.answer()
+        return
+
     await state.set_state(SellFlow.selecting_grade)
 
     data = await state.get_data()
@@ -118,7 +131,7 @@ async def handle_sell_category(
             await _edit_message(
                 callback,
                 fr.SELL_SELECT_BOOK,
-                reply_markup=get_book_keyboard(books_data),
+                reply_markup=get_book_keyboard(books_data, back_callback="buy:back:category"),
             )
             await callback.answer()
             return
@@ -159,6 +172,54 @@ async def handle_sell_back_to_category(
         reply_markup=get_sell_category_keyboard(),
     )
     await callback.answer()
+
+
+# Custom book title (other books category)
+@router.callback_query(SellFlow.entering_custom_title, F.data == "buy:back:category")
+async def handle_sell_back_from_custom_title(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    """Handle back to category from custom title entry."""
+    await state.set_state(SellFlow.selecting_category)
+    await _edit_message(
+        callback,
+        fr.SELL_SELECT_CATEGORY,
+        reply_markup=get_sell_category_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.message(SellFlow.entering_custom_title)
+async def handle_custom_title_input(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Handle custom book title input for the other books category."""
+    if not message.text:
+        await message.answer(fr.SELL_CUSTOM_TITLE_INVALID)
+        return
+
+    try:
+        title = ListingService.validate_book_title(message.text)
+    except ListingValidationError as e:
+        await message.answer(str(e))
+        return
+
+    data = await state.get_data()
+    academic_year_id = data["academic_year_id"]
+
+    book_repo = BookRepository(session)
+    book, _ = await book_repo.find_or_create(
+        category="other",
+        title=title,
+        catalog_year_id=academic_year_id,
+    )
+
+    await state.update_data(book_id=book.id, book_title=book.title, category="other")
+    await state.set_state(SellFlow.entering_price)
+    await message.answer(fr.SELL_ENTER_PRICE)
 
 
 # Grade selection
@@ -289,6 +350,21 @@ async def handle_sell_subject(
 
 
 # Back to subject from book
+@router.callback_query(SellFlow.selecting_book, F.data == "buy:back:category")
+async def handle_sell_back_to_category_from_book(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    """Handle back to category from book list without grade/subject."""
+    await state.set_state(SellFlow.selecting_category)
+    await _edit_message(
+        callback,
+        fr.SELL_SELECT_CATEGORY,
+        reply_markup=get_sell_category_keyboard(),
+    )
+    await callback.answer()
+
+
 @router.callback_query(SellFlow.selecting_book, F.data == "buy:back:subject")
 async def handle_sell_back_to_subject(
     callback: CallbackQuery,

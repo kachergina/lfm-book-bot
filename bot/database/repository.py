@@ -671,6 +671,34 @@ class BookRepository:
         )
         return list(result.scalars().all())
 
+    async def get_books_with_active_listings_by_category(
+        self,
+        catalog_year_id: int,
+        category: str,
+    ) -> list[Book]:
+        """Get books in a category that have at least one active listing.
+
+        Args:
+            catalog_year_id: Academic year ID.
+            category: Book category.
+
+        Returns:
+            List of books with active listings, ordered by title.
+        """
+        result = await self.session.execute(
+            select(Book)
+            .join(Listing, Listing.book_id == Book.id)
+            .where(
+                Book.catalog_year_id == catalog_year_id,
+                Book.category == category,
+                Listing.academic_year_id == catalog_year_id,
+                Listing.status == "active",
+            )
+            .distinct()
+            .order_by(Book.title),
+        )
+        return list(result.scalars().all())
+
     async def get_books_by_category(
         self,
         catalog_year_id: int,

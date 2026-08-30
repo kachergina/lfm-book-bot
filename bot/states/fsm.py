@@ -17,6 +17,7 @@ class SellFlow(StatesGroup):
     """States for the selling/listing creation flow."""
 
     selecting_category = State()
+    entering_custom_title = State()
     selecting_grade = State()
     selecting_subject = State()
     selecting_book = State()
@@ -40,4 +41,7 @@ class ManageListingFlow(StatesGroup):
     editing_phone = State()
     editing_telegram = State()
     editing_description = State()
+    editing_photos = State()
+    adding_photos = State()
+    deleting_photos = State()
     confirming_status_change = State()

@@ -16,7 +16,7 @@ from bot.database.repository import (
 VALID_STATUSES = {"active", "reserved", "sold", "archived", "expired"}
 
 VALID_TRANSITIONS: dict[str, set[str]] = {
-    "active": {"reserved", "archived", "expired"},
+    "active": {"reserved", "sold", "archived", "expired"},
     "reserved": {"active", "sold", "archived"},
     "sold": set(),
     "archived": set(),
@@ -30,6 +30,7 @@ TELEGRAM_PATTERN = re.compile(r"^@[A-Za-z0-9_]{5,32}$")
 
 MAX_PHOTOS = 5
 MAX_DESCRIPTION_LENGTH = 500
+MAX_TITLE_LENGTH = 255
 MAX_PRICE = Decimal("99999.99")
 MIN_PRICE = Decimal("0.01")
 
@@ -159,6 +160,28 @@ class ListingService:
                 "5 à 32 caractères, lettres, chiffres et underscores."
             )
         return cleaned
+
+    @staticmethod
+    def validate_book_title(title: str) -> str:
+        """Validate a custom book title.
+
+        Args:
+            title: Book title entered by the seller.
+
+        Returns:
+            Validated title.
+
+        Raises:
+            ListingValidationError: If title is empty or too long.
+        """
+        trimmed = title.strip()
+        if not trimmed:
+            raise ListingValidationError("Le titre du livre est obligatoire.")
+        if len(trimmed) > MAX_TITLE_LENGTH:
+            raise ListingValidationError(
+                f"Le titre ne peut pas dépasser {MAX_TITLE_LENGTH} caractères."
+            )
+        return trimmed
 
     @staticmethod
     def validate_description(description: str | None) -> str | None:

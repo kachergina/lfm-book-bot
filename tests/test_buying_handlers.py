@@ -747,3 +747,88 @@ async def test_handle_back_to_books_from_viewing_listings(
 
     state_data = await state.get_state()
     assert state_data == BuyFlow.selecting_book
+
+
+@pytest.mark.asyncio
+async def test_handle_book_selection_shows_description(
+    db_session,
+    academic_year,
+    user,
+):
+    """Test that listing description is shown to buyers when present."""
+    from bot.database.repository import BookRepository
+
+    repo = BookRepository(db_session)
+    book = await repo.create(
+        category="textbook",
+        title="Math 6eme",
+        catalog_year_id=academic_year.id,
+    )
+    await db_session.commit()
+
+    listing = Listing(
+        book_id=book.id,
+        seller_id=user.id,
+        academic_year_id=academic_year.id,
+        price=15.00,
+        condition="good",
+        status="active",
+        contact_phone="0612345678",
+        description="Quelques annotations au crayon",
+    )
+    db_session.add(listing)
+    await db_session.commit()
+
+    callback = _create_mock_callback(f"buy:book:{book.id}")
+    state = _create_mock_state()
+    await state.set_state(BuyFlow.selecting_book)
+    await state.update_data(academic_year_id=academic_year.id)
+
+    await handle_book_selection(callback, state, db_session)
+
+    calls = callback.message.answer.call_args_list
+    listing_texts = [c.args[0] for c in calls if "Quelques annotations" in c.args[0]]
+    assert len(listing_texts) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_book_selection_hides_empty_description(
+    db_session,
+    academic_year,
+    user,
+):
+    """Test that empty description line is omitted for buyers."""
+    from bot.database.repository import BookRepository
+    from bot.locale import fr
+
+    repo = BookRepository(db_session)
+    book = await repo.create(
+        category="textbook",
+        title="Math 6eme",
+        catalog_year_id=academic_year.id,
+    )
+    await db_session.commit()
+
+    listing = Listing(
+        book_id=book.id,
+        seller_id=user.id,
+        academic_year_id=academic_year.id,
+        price=15.00,
+        condition="good",
+        status="active",
+        contact_phone="0612345678",
+        description=None,
+    )
+    db_session.add(listing)
+    await db_session.commit()
+
+    callback = _create_mock_callback(f"buy:book:{book.id}")
+    state = _create_mock_state()
+    await state.set_state(BuyFlow.selecting_book)
+    await state.update_data(academic_year_id=academic_year.id)
+
+    await handle_book_selection(callback, state, db_session)
+
+    calls = callback.message.answer.call_args_list
+    listing_call = next(c for c in calls if "0612345678" in c.args[0])
+    assert fr.BUY_LISTING_DESCRIPTION.split("{")[0] not in listing_call.args[0]

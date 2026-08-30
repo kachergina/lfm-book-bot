@@ -238,3 +238,83 @@ async def test_handle_confirm_status(db_session, academic_year, user):
 
     callback.message.edit_text.assert_called_once()
     callback.answer.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_confirm_status_active_to_sold(db_session, academic_year, user):
+    """Test confirming mark as sold from active listing."""
+    from bot.database.repository import BookRepository, ListingRepository
+
+    book_repo = BookRepository(db_session)
+    book = await book_repo.create(
+        category="textbook",
+        title="Math 6eme",
+        catalog_year_id=academic_year.id,
+    )
+    await db_session.commit()
+
+    from bot.database.models import Listing
+
+    listing = Listing(
+        book_id=book.id,
+        seller_id=user.id,
+        academic_year_id=academic_year.id,
+        price=15.00,
+        condition="good",
+        status="active",
+        contact_phone="0612345678",
+    )
+    db_session.add(listing)
+    await db_session.commit()
+
+    callback = _create_mock_callback(f"ml:{listing.id}:confirm:sell")
+    state = _create_mock_state()
+    await state.set_state(ManageListingFlow.managing)
+    await state.update_data(listing_id=listing.id)
+
+    await handle_confirm_status(callback, state, db_session)
+
+    listing_repo = ListingRepository(db_session)
+    updated = await listing_repo.get_by_id(listing.id)
+    assert updated is not None
+    assert updated.status == "sold"
+
+
+@pytest.mark.asyncio
+async def test_handle_edit_contact_back_to_manage(db_session, academic_year, user):
+    """Test back button during contact editing returns to manage view."""
+    from bot.database.repository import BookRepository
+
+    book_repo = BookRepository(db_session)
+    book = await book_repo.create(
+        category="textbook",
+        title="Math 6eme",
+        catalog_year_id=academic_year.id,
+    )
+    await db_session.commit()
+
+    from bot.database.models import Listing
+    from bot.handlers.listings import handle_edit_contact_back_to_manage
+
+    listing = Listing(
+        book_id=book.id,
+        seller_id=user.id,
+        academic_year_id=academic_year.id,
+        price=15.00,
+        condition="good",
+        status="active",
+        contact_phone="0612345678",
+    )
+    db_session.add(listing)
+    await db_session.commit()
+
+    callback = _create_mock_callback(f"ml:{listing.id}:back:manage")
+    state = _create_mock_state()
+    await state.set_state(ManageListingFlow.editing_phone)
+    await state.update_data(listing_id=listing.id)
+
+    await handle_edit_contact_back_to_manage(callback, state, db_session)
+
+    callback.message.edit_text.assert_called_once()
+    state_data = await state.get_state()
+    assert state_data == ManageListingFlow.managing

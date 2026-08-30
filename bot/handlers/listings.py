@@ -10,14 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.keyboards.listings import (
     get_condition_keyboard,
     get_confirm_status_keyboard,
-    get_contact_method_keyboard,
     get_description_action_keyboard,
+    get_edit_photos_menu_keyboard,
     get_listing_manage_keyboard,
     get_listings_list_keyboard,
+    get_manage_contact_method_keyboard,
+    get_manage_photos_add_keyboard,
+    get_manage_photos_delete_keyboard,
     get_my_listings_tabs_keyboard,
 )
 from bot.locale import fr
 from bot.services.listing import (
+    MAX_PHOTOS,
     InvalidTransitionError,
     ListingOwnershipError,
     ListingService,
@@ -30,6 +34,9 @@ from bot.utils.helpers import format_price
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+_ML_STATUS_ACTION = F.data.regexp(r"^ml:\d+:(reserve|sell|activate|archive)$")
+_ML_STATUS_CANCEL = F.data.regexp(r"^ml:\d+:cancel$")
 
 
 async def _get_user_id(callback: CallbackQuery, session: AsyncSession) -> int | None:
@@ -582,9 +589,26 @@ async def handle_edit_phone(
     await _edit_message(
         callback,
         fr.SELL_SELECT_CONTACT_METHOD,
-        reply_markup=get_contact_method_keyboard(),
+        reply_markup=get_manage_contact_method_keyboard(listing_id),
     )
     await callback.answer()
+
+
+@router.callback_query(ManageListingFlow.editing_phone, F.data.endswith(":back:manage"))
+async def handle_edit_contact_back_to_manage(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Handle back to listing management from contact editing."""
+    data = await state.get_data()
+    listing_id = data.get("listing_id")
+    if listing_id is None:
+        await callback.answer(fr.MSG_DATA_ERROR, show_alert=True)
+        return
+
+    await state.set_state(ManageListingFlow.managing)
+    await _show_listing_detail(callback, session, listing_id)
 
 
 @router.callback_query(ManageListingFlow.editing_phone, F.data.startswith("sell:contact:"))
@@ -764,131 +788,379 @@ async def handle_description_input(
     )
 
 
+# Edit photos
+@router.callback_query(ManageListingFlow.managing, F.data.endswith(":edit_photos"))
+async def handle_edit_photos(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Handle edit photos action."""
+    if not callback.data:
+        return
+
+    try:
+        listing_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
+        return
+
+    user_id = await _get_user_id(callback, session)
+    if user_id is None:
+        await callback.answer(fr.MSG_USER_NOT_FOUND, show_alert=True)
+        return
+
+    service = ListingService(session)
+    try:
+        listing = await service.get_user_listing(listing_id, user_id)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    photo_count = len(listing.photos or [])
+    await state.update_data(listing_id=listing_id)
+    await state.set_state(ManageListingFlow.editing_photos)
+
+    await _edit_message(
+        callback,
+        fr.MANAGE_EDIT_PHOTOS_TITLE.format(count=photo_count, max=MAX_PHOTOS),
+        reply_markup=get_edit_photos_menu_keyboard(listing_id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(ManageListingFlow.editing_photos, F.data.endswith(":back:manage"))
+@router.callback_query(ManageListingFlow.adding_photos, F.data.endswith(":back:manage"))
+@router.callback_query(ManageListingFlow.deleting_photos, F.data.endswith(":back:manage"))
+async def handle_back_to_manage_from_photos(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Handle back to listing management from photo editing."""
+    data = await state.get_data()
+    listing_id = data.get("listing_id")
+    if listing_id is None:
+        await callback.answer(fr.MSG_DATA_ERROR, show_alert=True)
+        return
+
+    await state.set_state(ManageListingFlow.managing)
+    await _show_listing_detail(callback, session, listing_id)
+
+
+@router.callback_query(ManageListingFlow.editing_photos, F.data.endswith(":back:photos_menu"))
+@router.callback_query(ManageListingFlow.adding_photos, F.data.endswith(":back:photos_menu"))
+@router.callback_query(ManageListingFlow.deleting_photos, F.data.endswith(":back:photos_menu"))
+async def handle_back_to_photos_menu(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Handle back to photo editing submenu."""
+    data = await state.get_data()
+    listing_id = data.get("listing_id")
+    if listing_id is None:
+        await callback.answer(fr.MSG_DATA_ERROR, show_alert=True)
+        return
+
+    user_id = await _get_user_id(callback, session)
+    if user_id is None:
+        await callback.answer(fr.MSG_USER_NOT_FOUND, show_alert=True)
+        return
+
+    service = ListingService(session)
+    try:
+        listing = await service.get_user_listing(listing_id, user_id)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    photo_count = len(listing.photos or [])
+    await state.set_state(ManageListingFlow.editing_photos)
+    await _edit_message(
+        callback,
+        fr.MANAGE_EDIT_PHOTOS_TITLE.format(count=photo_count, max=MAX_PHOTOS),
+        reply_markup=get_edit_photos_menu_keyboard(listing_id),
+    )
+    await callback.answer()
+
+
+@router.callback_query(ManageListingFlow.editing_photos, F.data.endswith(":photos:add"))
+async def handle_add_photos_start(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Start adding photos to an existing listing."""
+    if not callback.data:
+        return
+
+    try:
+        listing_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
+        return
+
+    user_id = await _get_user_id(callback, session)
+    if user_id is None:
+        await callback.answer(fr.MSG_USER_NOT_FOUND, show_alert=True)
+        return
+
+    service = ListingService(session)
+    try:
+        listing = await service.get_user_listing(listing_id, user_id)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    current_photos = list(listing.photos or [])
+    if len(current_photos) >= MAX_PHOTOS:
+        await callback.answer(
+            fr.MANAGE_PHOTOS_AT_MAX.format(max=MAX_PHOTOS),
+            show_alert=True,
+        )
+        return
+
+    await state.update_data(listing_id=listing_id, pending_photos=current_photos)
+    await state.set_state(ManageListingFlow.adding_photos)
+
+    await _edit_message(
+        callback,
+        fr.MANAGE_ADD_PHOTOS_PROMPT.format(
+            count=len(current_photos),
+            max=MAX_PHOTOS,
+        ),
+        reply_markup=get_manage_photos_add_keyboard(listing_id),
+    )
+    await callback.answer()
+
+
+@router.message(ManageListingFlow.adding_photos, F.photo)
+async def handle_add_photos_upload(
+    message: Message,
+    state: FSMContext,
+) -> None:
+    """Handle photo upload while editing an existing listing."""
+    if not message.photo:
+        return
+
+    data = await state.get_data()
+    photos = list(data.get("pending_photos", []))
+
+    if len(photos) >= MAX_PHOTOS:
+        await message.answer(
+            fr.SELL_PHOTOS_MAX_REACHED.format(max=MAX_PHOTOS),
+        )
+        return
+
+    photo = message.photo[-1]
+    photos.append(photo.file_id)
+    await state.update_data(pending_photos=photos)
+
+    listing_id = data.get("listing_id")
+    await message.answer(
+        fr.SELL_PHOTOS_RECEIVED.format(count=len(photos), max=MAX_PHOTOS),
+        reply_markup=get_manage_photos_add_keyboard(listing_id) if listing_id else None,
+    )
+
+
+@router.callback_query(ManageListingFlow.adding_photos, F.data.endswith(":photos:done_add"))
+async def handle_add_photos_done(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Save newly added photos to the listing."""
+    from bot.database.repository import UserRepository
+
+    if not callback.data or not callback.from_user:
+        return
+
+    data = await state.get_data()
+    listing_id = data.get("listing_id")
+    pending_photos = data.get("pending_photos")
+    if listing_id is None or pending_photos is None:
+        await callback.answer(fr.MSG_DATA_ERROR, show_alert=True)
+        return
+
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_telegram_id(callback.from_user.id)
+    if user is None:
+        await callback.answer(fr.MSG_USER_NOT_FOUND, show_alert=True)
+        return
+
+    service = ListingService(session)
+    try:
+        await service.update_field(listing_id, user.id, "photos", pending_photos)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    await state.set_state(ManageListingFlow.managing)
+    await _edit_message(callback, fr.LISTING_EDITED_PHOTOS)
+    await callback.answer()
+
+    listing = await service.get_user_listing(listing_id, user.id)
+    if callback.message and hasattr(callback.message, "answer"):
+        await callback.message.answer(
+            fr.MANAGE_LISTING_TITLE,
+            reply_markup=get_listing_manage_keyboard(listing_id, listing.status),
+        )
+
+
+@router.callback_query(ManageListingFlow.editing_photos, F.data.endswith(":photos:delete"))
+async def handle_delete_photos_start(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Show photo selection for deletion."""
+    if not callback.data:
+        return
+
+    try:
+        listing_id = int(callback.data.split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
+        return
+
+    user_id = await _get_user_id(callback, session)
+    if user_id is None:
+        await callback.answer(fr.MSG_USER_NOT_FOUND, show_alert=True)
+        return
+
+    service = ListingService(session)
+    try:
+        listing = await service.get_user_listing(listing_id, user_id)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    photos = list(listing.photos or [])
+    if not photos:
+        await callback.answer(fr.MANAGE_NO_PHOTOS_TO_DELETE, show_alert=True)
+        return
+
+    await state.update_data(listing_id=listing_id)
+    await state.set_state(ManageListingFlow.deleting_photos)
+
+    await _edit_message(
+        callback,
+        fr.MANAGE_DELETE_PHOTOS_PROMPT.format(count=len(photos)),
+        reply_markup=get_manage_photos_delete_keyboard(listing_id, photos),
+    )
+    await callback.answer()
+
+
+@router.callback_query(ManageListingFlow.deleting_photos, F.data.regexp(r"^ml:\d+:photos:del:\d+$"))
+async def handle_delete_single_photo(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    """Delete a specific photo from the listing."""
+    from bot.database.repository import UserRepository
+
+    if not callback.data or not callback.from_user:
+        return
+
+    parts = callback.data.split(":")
+    try:
+        listing_id = int(parts[1])
+        photo_index = int(parts[4])
+    except (ValueError, IndexError):
+        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
+        return
+
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_telegram_id(callback.from_user.id)
+    if user is None:
+        await callback.answer(fr.MSG_USER_NOT_FOUND, show_alert=True)
+        return
+
+    service = ListingService(session)
+    try:
+        listing = await service.get_user_listing(listing_id, user.id)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    photos = list(listing.photos or [])
+    if photo_index < 0 or photo_index >= len(photos):
+        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
+        return
+
+    photos.pop(photo_index)
+    updated_photos = photos if photos else None
+
+    try:
+        await service.update_field(listing_id, user.id, "photos", updated_photos)
+    except (ListingValidationError, ListingOwnershipError) as e:
+        await callback.answer(str(e), show_alert=True)
+        return
+
+    if not photos:
+        await state.set_state(ManageListingFlow.editing_photos)
+        await _edit_message(
+            callback,
+            fr.MANAGE_EDIT_PHOTOS_TITLE.format(count=0, max=MAX_PHOTOS),
+            reply_markup=get_edit_photos_menu_keyboard(listing_id),
+        )
+    else:
+        await _edit_message(
+            callback,
+            fr.MANAGE_DELETE_PHOTOS_PROMPT.format(count=len(photos)),
+            reply_markup=get_manage_photos_delete_keyboard(listing_id, photos),
+        )
+    await callback.answer(fr.LISTING_EDITED_PHOTOS)
+
+
 # ===== STATUS CHANGES =====
 
+_STATUS_PROMPTS = {
+    "reserve": fr.CONFIRM_MARK_RESERVED,
+    "sell": fr.CONFIRM_MARK_SOLD,
+    "activate": fr.CONFIRM_MARK_ACTIVE,
+    "archive": fr.CONFIRM_ARCHIVE,
+}
 
-# Mark as reserved
-@router.callback_query(ManageListingFlow.managing, F.data.endswith(":reserve"))
-async def handle_reserve(
+
+@router.callback_query(ManageListingFlow.managing, _ML_STATUS_ACTION)
+async def handle_status_action_prompt(
     callback: CallbackQuery,
     state: FSMContext,
 ) -> None:
-    """Handle mark as reserved.
-
-    Args:
-        callback: Telegram callback.
-        state: FSM state.
-    """
+    """Handle status change action — show confirmation prompt."""
     if not callback.data:
         return
 
+    parts = callback.data.split(":")
     try:
-        listing_id = int(callback.data.split(":")[1])
+        listing_id = int(parts[1])
+        action = parts[2]
     except (ValueError, IndexError):
         await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
         return
 
-    await state.update_data(listing_id=listing_id, pending_action="reserve")
-
-    await _edit_message(
-        callback,
-        fr.CONFIRM_MARK_RESERVED,
-        reply_markup=get_confirm_status_keyboard(listing_id, "reserve"),
-    )
-    await callback.answer()
-
-
-# Mark as sold
-@router.callback_query(ManageListingFlow.managing, F.data.endswith(":sell"))
-async def handle_sell(
-    callback: CallbackQuery,
-    state: FSMContext,
-) -> None:
-    """Handle mark as sold.
-
-    Args:
-        callback: Telegram callback.
-        state: FSM state.
-    """
-    if not callback.data:
-        return
-
-    try:
-        listing_id = int(callback.data.split(":")[1])
-    except (ValueError, IndexError):
+    if action not in _STATUS_PROMPTS:
         await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
         return
 
-    await state.update_data(listing_id=listing_id, pending_action="sell")
+    await state.update_data(listing_id=listing_id, pending_action=action)
 
     await _edit_message(
         callback,
-        fr.CONFIRM_MARK_SOLD,
-        reply_markup=get_confirm_status_keyboard(listing_id, "sell"),
+        _STATUS_PROMPTS[action],
+        reply_markup=get_confirm_status_keyboard(listing_id, action),
     )
     await callback.answer()
 
 
-# Mark as active (from reserved)
-@router.callback_query(ManageListingFlow.managing, F.data.endswith(":activate"))
-async def handle_activate(
-    callback: CallbackQuery,
-    state: FSMContext,
-) -> None:
-    """Handle mark as active.
-
-    Args:
-        callback: Telegram callback.
-        state: FSM state.
-    """
-    if not callback.data:
-        return
-
-    try:
-        listing_id = int(callback.data.split(":")[1])
-    except (ValueError, IndexError):
-        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
-        return
-
-    await state.update_data(listing_id=listing_id, pending_action="activate")
-
-    await _edit_message(
-        callback,
-        fr.CONFIRM_MARK_ACTIVE,
-        reply_markup=get_confirm_status_keyboard(listing_id, "activate"),
-    )
-    await callback.answer()
-
-
-# Archive
-@router.callback_query(ManageListingFlow.managing, F.data.endswith(":archive"))
-async def handle_archive(
-    callback: CallbackQuery,
-    state: FSMContext,
-) -> None:
-    """Handle archive/delete.
-
-    Args:
-        callback: Telegram callback.
-        state: FSM state.
-    """
-    if not callback.data:
-        return
-
-    try:
-        listing_id = int(callback.data.split(":")[1])
-    except (ValueError, IndexError):
-        await callback.answer(fr.MSG_INVALID_ACTION, show_alert=True)
-        return
-
-    await state.update_data(listing_id=listing_id, pending_action="archive")
-
-    await _edit_message(
-        callback,
-        fr.CONFIRM_ARCHIVE,
-        reply_markup=get_confirm_status_keyboard(listing_id, "archive"),
-    )
-    await callback.answer()
+# Backward-compatible aliases for tests
+handle_reserve = handle_status_action_prompt
+handle_sell = handle_status_action_prompt
+handle_activate = handle_status_action_prompt
+handle_archive = handle_status_action_prompt
 
 
 # Confirm status change
@@ -1037,7 +1309,7 @@ async def _validate_confirm_status_inputs(
 
 
 # Cancel status change
-@router.callback_query(ManageListingFlow.managing, F.data.endswith(":cancel"))
+@router.callback_query(ManageListingFlow.managing, _ML_STATUS_CANCEL)
 async def handle_cancel_status(
     callback: CallbackQuery,
     state: FSMContext,

@@ -13,7 +13,7 @@ from bot.locale import fr
 def test_category_keyboard():
     """Test category keyboard has correct buttons."""
     keyboard = get_category_keyboard()
-    assert len(keyboard.inline_keyboard) == 3
+    assert len(keyboard.inline_keyboard) == 4
 
     # First row: textbook
     assert keyboard.inline_keyboard[0][0].text == fr.CATEGORY_TEXTBOOK
@@ -23,9 +23,13 @@ def test_category_keyboard():
     assert keyboard.inline_keyboard[1][0].text == fr.CATEGORY_LITERATURE
     assert keyboard.inline_keyboard[1][0].callback_data == "buy:cat:literature"
 
-    # Third row: back
-    assert keyboard.inline_keyboard[2][0].text == fr.BTN_BACK
-    assert keyboard.inline_keyboard[2][0].callback_data == "buy:back:menu"
+    # Third row: other books
+    assert keyboard.inline_keyboard[2][0].text == fr.CATEGORY_OTHER
+    assert keyboard.inline_keyboard[2][0].callback_data == "buy:cat:other"
+
+    # Fourth row: back
+    assert keyboard.inline_keyboard[3][0].text == fr.BTN_BACK
+    assert keyboard.inline_keyboard[3][0].callback_data == "buy:back:menu"
 
 
 def test_grade_keyboard():

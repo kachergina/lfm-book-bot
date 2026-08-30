@@ -26,7 +26,7 @@ def get_condition_keyboard() -> InlineKeyboardMarkup:
 
 
 def get_contact_method_keyboard() -> InlineKeyboardMarkup:
-    """Get contact method selection keyboard.
+    """Get contact method selection keyboard for the sell flow.
 
     Returns:
         Inline keyboard with phone and telegram options.
@@ -46,6 +46,32 @@ def get_contact_method_keyboard() -> InlineKeyboardMarkup:
                 ),
             ],
             [InlineKeyboardButton(text=fr.BTN_BACK, callback_data="sell:back:condition")],
+        ]
+    )
+
+
+def get_manage_contact_method_keyboard(listing_id: int) -> InlineKeyboardMarkup:
+    """Get contact method selection keyboard for listing management."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=fr.SELL_CONTACT_METHOD_PHONE,
+                    callback_data="sell:contact:phone",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=fr.SELL_CONTACT_METHOD_TELEGRAM,
+                    callback_data="sell:contact:telegram",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=fr.BTN_BACK_TO_MANAGE,
+                    callback_data=f"ml:{listing_id}:back:manage",
+                ),
+            ],
         ]
     )
 
@@ -263,6 +289,14 @@ def get_listing_manage_keyboard(listing_id: int, status: str) -> InlineKeyboardM
             )
         ]
     )
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text=fr.BTN_EDIT_PHOTOS,
+                callback_data=f"ml:{listing_id}:edit_photos",
+            )
+        ]
+    )
 
     # Status-specific actions
     if status == "active":
@@ -357,3 +391,75 @@ def get_confirm_status_keyboard(
             ],
         ]
     )
+
+
+def get_edit_photos_menu_keyboard(listing_id: int) -> InlineKeyboardMarkup:
+    """Get photo editing submenu for listing management."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=fr.BTN_ADD_PHOTOS,
+                    callback_data=f"ml:{listing_id}:photos:add",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=fr.BTN_DELETE_PHOTOS,
+                    callback_data=f"ml:{listing_id}:photos:delete",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=fr.BTN_BACK_TO_MANAGE,
+                    callback_data=f"ml:{listing_id}:back:manage",
+                ),
+            ],
+        ]
+    )
+
+
+def get_manage_photos_add_keyboard(listing_id: int) -> InlineKeyboardMarkup:
+    """Get keyboard while adding photos to an existing listing."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Terminé",
+                    callback_data=f"ml:{listing_id}:photos:done_add",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=fr.BTN_BACK,
+                    callback_data=f"ml:{listing_id}:back:photos_menu",
+                ),
+            ],
+        ]
+    )
+
+
+def get_manage_photos_delete_keyboard(
+    listing_id: int,
+    photos: list[str],
+) -> InlineKeyboardMarkup:
+    """Get keyboard for selecting a specific photo to delete."""
+    keyboard: list[list[InlineKeyboardButton]] = []
+    for index, _photo in enumerate(photos, start=1):
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    text=fr.MANAGE_PHOTO_DELETE_LABEL.format(number=index),
+                    callback_data=f"ml:{listing_id}:photos:del:{index - 1}",
+                ),
+            ]
+        )
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                text=fr.BTN_BACK,
+                callback_data=f"ml:{listing_id}:back:photos_menu",
+            ),
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)

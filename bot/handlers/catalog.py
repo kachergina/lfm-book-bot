@@ -89,6 +89,9 @@ async def _show_listings_for_book(
                 contact=contact,
             )
 
+        if listing.description:
+            text += f"\n{fr.BUY_LISTING_DESCRIPTION.format(description=listing.description)}"
+
         has_photos = bool(listing.photos)
         reply_markup = get_listing_detail_keyboard(
             listing_id=listing.id,
@@ -220,12 +223,31 @@ async def handle_category_selection(
     grades = await service.get_grade_levels(academic_year_id, category)
 
     if not grades:
+        if category == "other":
+            books = await service.get_books_with_active_listings_by_category(
+                academic_year_id,
+                category,
+            )
+        else:
+            books = await service.get_books_by_category(academic_year_id, category)
+
+        if not books:
+            await _edit_message(
+                callback,
+                fr.MSG_NO_BOOKS_IN_CATEGORY,
+                reply_markup=get_category_keyboard(),
+            )
+            await state.set_state(BuyFlow.selecting_category)
+            await callback.answer()
+            return
+
+        await state.set_state(BuyFlow.selecting_book)
+        books_data = [{"id": b.id, "title": b.title, "author": b.author} for b in books]
         await _edit_message(
             callback,
-            fr.MSG_NO_BOOKS_IN_CATEGORY,
-            reply_markup=get_category_keyboard(),
+            fr.BUY_SELECT_BOOK,
+            reply_markup=get_book_keyboard(books_data, back_callback="buy:back:category"),
         )
-        await state.set_state(BuyFlow.selecting_category)
         await callback.answer()
         return
 
@@ -379,6 +401,21 @@ async def handle_subject_selection(
         callback,
         fr.BUY_SELECT_BOOK,
         reply_markup=get_book_keyboard(books_data),
+    )
+    await callback.answer()
+
+
+@router.callback_query(BuyFlow.selecting_book, F.data == "buy:back:category")
+async def handle_back_to_category_from_book(
+    callback: CallbackQuery,
+    state: FSMContext,
+) -> None:
+    """Handle back to category selection from book list without grade/subject."""
+    await state.set_state(BuyFlow.selecting_category)
+    await _edit_message(
+        callback,
+        fr.BUY_SELECT_CATEGORY,
+        reply_markup=get_category_keyboard(),
     )
     await callback.answer()
 

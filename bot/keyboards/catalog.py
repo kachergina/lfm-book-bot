@@ -15,6 +15,7 @@ def get_category_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [InlineKeyboardButton(text=fr.CATEGORY_TEXTBOOK, callback_data="buy:cat:textbook")],
             [InlineKeyboardButton(text=fr.CATEGORY_LITERATURE, callback_data="buy:cat:literature")],
+            [InlineKeyboardButton(text=fr.CATEGORY_OTHER, callback_data="buy:cat:other")],
             [InlineKeyboardButton(text=fr.BTN_BACK, callback_data="buy:back:menu")],
         ],
     )
@@ -23,6 +24,15 @@ def get_category_keyboard() -> InlineKeyboardMarkup:
 def get_sell_category_keyboard() -> InlineKeyboardMarkup:
     """Get category selection keyboard for the sell flow."""
     return get_category_keyboard()
+
+
+def get_custom_title_keyboard() -> InlineKeyboardMarkup:
+    """Get keyboard for custom book title entry in the sell flow."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=fr.BTN_BACK, callback_data="buy:back:category")],
+        ],
+    )
 
 
 _GRADE_ORDER = {"6ème": 0, "5ème": 1, "4ème": 2, "3ème": 3, "2nde": 4, "1ère": 5, "Terminale": 6}
@@ -78,11 +88,15 @@ def get_subject_keyboard(subjects: list[str]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 
-def get_book_keyboard(books: list[dict]) -> InlineKeyboardMarkup:
+def get_book_keyboard(
+    books: list[dict],
+    back_callback: str = "buy:back:subject",
+) -> InlineKeyboardMarkup:
     """Get book selection keyboard.
 
     Args:
         books: List of book dicts with 'id', 'title', 'author'.
+        back_callback: Callback data for the back button.
 
     Returns:
         Inline keyboard with book options.
@@ -100,7 +114,7 @@ def get_book_keyboard(books: list[dict]) -> InlineKeyboardMarkup:
                 ),
             ]
         )
-    keyboard.append([InlineKeyboardButton(text=fr.BTN_BACK, callback_data="buy:back:subject")])
+    keyboard.append([InlineKeyboardButton(text=fr.BTN_BACK, callback_data=back_callback)])
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
 
 

@@ -304,3 +304,19 @@ def test_sell_category_keyboard_uses_buy_callbacks():
     keyboard = get_sell_category_keyboard()
     assert keyboard.inline_keyboard[0][0].callback_data == "buy:cat:textbook"
     assert keyboard.inline_keyboard[1][0].callback_data == "buy:cat:literature"
+    assert keyboard.inline_keyboard[2][0].callback_data == "buy:cat:other"
+
+
+@pytest.mark.asyncio
+async def test_handle_sell_category_other_prompts_custom_title(db_session, academic_year):
+    """Test other books category asks seller for a custom title."""
+    callback = _create_mock_callback("buy:cat:other")
+    state = _create_mock_state()
+    await state.set_state(SellFlow.selecting_category)
+    await state.update_data(academic_year_id=academic_year.id)
+
+    await handle_sell_category(callback, state, db_session)
+
+    assert await state.get_state() == SellFlow.entering_custom_title
+    call_args = callback.message.edit_text.call_args
+    assert fr.SELL_ENTER_CUSTOM_TITLE in call_args[0][0]

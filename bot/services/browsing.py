@@ -122,6 +122,25 @@ class BrowsingService:
         """
         return await self.book_repo.get_books_by_category(catalog_year_id, category)
 
+    async def get_books_with_active_listings_by_category(
+        self,
+        catalog_year_id: int,
+        category: str,
+    ) -> list[Book]:
+        """Get books in a category that have active listings.
+
+        Args:
+            catalog_year_id: Academic year ID.
+            category: Book category.
+
+        Returns:
+            List of books with active listings.
+        """
+        return await self.book_repo.get_books_with_active_listings_by_category(
+            catalog_year_id,
+            category,
+        )
+
     async def get_active_listings(
         self,
         book_id: int,

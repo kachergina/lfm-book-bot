@@ -1,15 +1,15 @@
-"""French translations for the user interface."""
+"""Русские переводы пользовательского интерфейса."""
 
 # Main menu
-WELCOME_MESSAGE = "Bienvenue sur LFM Bourse aux livres !"
-MAIN_MENU_TITLE = "📚 Menu principal"
-MAIN_MENU_ACADEMIC_YEAR = "Année scolaire: {year}"
+WELCOME_MESSAGE = "Добро пожаловать в LFM Биржу книг!"
+MAIN_MENU_TITLE = "📚 Главное меню"
+MAIN_MENU_ACADEMIC_YEAR = "Учебный год: {year}"
 
 # Main menu buttons
-BTN_BUY_BOOK = "🔍 Acheter un livre"
-BTN_SELL_BOOK = "📝 Mettre en vente"
-BTN_MY_LISTINGS = "📋 Mes annonces"
-BTN_HELP = "❓ Aide"
+BTN_BUY_BOOK = "🔍 Купить книгу"
+BTN_SELL_BOOK = "📝 Выставить на продажу"
+BTN_MY_LISTINGS = "📋 Мои объявления"
+BTN_HELP = "❓ Помощь"
 
 # Placeholder messages for unimplemented features
 MSG_BUY_NOT_IMPLEMENTED = "Cette fonctionnalité sera disponible prochainement."
@@ -25,7 +25,7 @@ HELP_MESSAGE = (
     "/start - Afficher le menu principal\n"
     "/help - Afficher cette aide\n\n"
     "Fonctionnalités:\n"
-    "- 🔍 Acheter un livre\n"
+    "- 🔍 Купить книгу\n"
     "- 📝 Mettre un livre en vente\n"
     "- 📋 Gérer vos annonces"
 )
@@ -38,42 +38,42 @@ MSG_UNEXPECTED_ERROR = "Une erreur inattendue s'est produite."
 MSG_DB_ERROR = "Erreur de base de données. Veuillez réessayer."
 
 # Buying flow - Category selection
-BUY_SELECT_CATEGORY = "Choisissez une catégorie :"
-CATEGORY_TEXTBOOK = "📚 Manuel scolaire"
-CATEGORY_LITERATURE = "📖 Livre de littérature"
-CATEGORY_OTHER = "📚 Autres livres"
+BUY_SELECT_CATEGORY = "Выберите категорию:"
+CATEGORY_TEXTBOOK = "📚 Учебник"
+CATEGORY_LITERATURE = "📖 Художественная литература"
+CATEGORY_OTHER = "📚 Другие книги"
 
 # Buying flow - Grade level selection
-BUY_SELECT_GRADE = "Choisissez la classe :"
+BUY_SELECT_GRADE = "Выберите класс:"
 
 # Buying flow - Subject selection
-BUY_SELECT_SUBJECT = "Choisissez la matière :"
+BUY_SELECT_SUBJECT = "Выберите предмет:"
 
 # Buying flow - Book selection
-BUY_SELECT_BOOK = "Choisissez un livre :"
+BUY_SELECT_BOOK = "Выберите книгу:"
 BUY_BOOK_INFO = "📖 {title}"
 BUY_BOOK_AUTHOR = "Auteur: {author}"
 BUY_BOOK_PUBLISHER = "Éditeur: {publisher}"
 
 # Buying flow - Listings
-BUY_LISTINGS_TITLE = "📋 Annonces disponibles pour : {book_title}"
+BUY_LISTINGS_TITLE = "📋 Объявления для: {book_title}"
 BUY_LISTING_ITEM = "💰 Prix: {price} ₽\n📦 État: {condition}\n📞 Contact : {contact}"
 BUY_LISTING_ITEM_TELEGRAM = "💰 Prix: {price} ₽\n📦 État: {condition}\n💬 Telegram : {contact}"
 BUY_LISTING_DESCRIPTION = "📝 {description}"
-BUY_LISTING_NO_DESCRIPTION = "Pas de description"
-BUY_NO_LISTINGS = "Aucune annonce disponible pour ce livre pour le moment."
-BUY_BTN_VIEW_PHOTOS = "📸 Voir les photos"
+BUY_LISTING_NO_DESCRIPTION = "Без описания"
+BUY_NO_LISTINGS = "Пока нет объявлений для этой книги."
+BUY_BTN_VIEW_PHOTOS = "📸 Посмотреть фото"
 BUY_PHOTOS_NAV = "Utilisez les boutons ci-dessous pour naviguer :"
 
 # Navigation
-BTN_BACK = "⬅️ Retour"
-BTN_MAIN_MENU = "🏠 Menu principal"
+BTN_BACK = "⬅️ Назад"
+BTN_MAIN_MENU = "🏠 Главное меню"
 
 # Academic year errors
 MSG_NO_ACADEMIC_YEAR = (
     "Aucune année scolaire n'est configurée. Veuillez contacter l'administrateur."
 )
-MSG_NO_BOOKS_IN_CATEGORY = "Aucun livre trouvé dans cette catégorie."
+MSG_NO_BOOKS_IN_CATEGORY = "В этой категории книги не найдены."
 
 # Condition labels
 CONDITION_NEW = "Neuf"
@@ -117,19 +117,19 @@ STATUS_LABELS = {
 # ===== SELL FLOW =====
 
 # Sell flow - Category selection (same as buy flow but with sell context)
-SELL_SELECT_CATEGORY = "Choisissez la catégorie du livre à vendre :"
+SELL_SELECT_CATEGORY = "Выберите категорию книги для продажи:"
 
 # Sell flow - Grade selection
-SELL_SELECT_GRADE = "Choisissez la classe :"
+SELL_SELECT_GRADE = "Выберите класс:"
 
 # Sell flow - Subject selection
-SELL_SELECT_SUBJECT = "Choisissez la matière :"
+SELL_SELECT_SUBJECT = "Выберите предмет:"
 
 # Sell flow - Book selection
 SELL_SELECT_BOOK = "Sélectionnez le livre dans le catalogue :"
-SELL_ENTER_CUSTOM_TITLE = "📖 Entrez le titre du livre :"
-SELL_CUSTOM_TITLE_INVALID = "Titre invalide. Entrez un titre entre 1 et 255 caractères."
-SELL_NO_BOOKS = "Aucun livre trouvé dans cette catégorie. Essayez une autre catégorie."
+SELL_ENTER_CUSTOM_TITLE = "📖 Введите название книги:"
+SELL_CUSTOM_TITLE_INVALID = "Неверное название. Введите от 1 до 255 символов."
+SELL_NO_BOOKS = "В этой категории книги не найдены. Essayez une autre catégorie."
 
 # Sell flow - Price
 SELL_ENTER_PRICE = "💰 Entrez le prix en roubles (₽) :\nExemple : 1500"
@@ -171,7 +171,7 @@ SELL_PHOTOS_RECEIVED = (
     "Si vous souhaitez ajouter d'autres photos, envoyez-les. "
     "Sinon, cliquez sur « ✅ Terminer »."
 )
-SELL_PHOTOS_MAX_REACHED = "Maximum de {max} photos atteint."
+SELL_PHOTOS_MAX_REACHED = "Достигнут максимум {max} фото."
 SELL_PHOTOS_DONE = "Photos enregistrées."
 SELL_PHOTOS_NONE = "Aucune photo ajoutée."
 
@@ -230,14 +230,14 @@ MANAGE_LISTING_ACTIONS = "Choisissez une action :"
 BTN_EDIT_PRICE = "✏️ Modifier prix"
 BTN_EDIT_CONDITION = "✏️ Modifier état"
 BTN_EDIT_PHONE = "✏️ Modifier contact"
-BTN_EDIT_DESCRIPTION = "✏️ Modifier description"
-BTN_EDIT_PHOTOS = "📸 Modifier les photos"
-BTN_ADD_PHOTOS = "➕ Ajouter des photos"
-BTN_DELETE_PHOTOS = "🗑️ Supprimer des photos"
-BTN_MARK_RESERVED = "🔄 Marquer réservée"
-BTN_MARK_SOLD = "✅ Marquer vendue"
+BTN_EDIT_DESCRIPTION = "✏️ Изменить описание"
+BTN_EDIT_PHOTOS = "📸 Изменить фотографии"
+BTN_ADD_PHOTOS = "➕ Добавить фотографии"
+BTN_DELETE_PHOTOS = "🗑️ Удалить фотографии"
+BTN_MARK_RESERVED = "🔄 Отметить как зарезервированное"
+BTN_MARK_SOLD = "✅ Отметить как проданное"
 BTN_MARK_ACTIVE = "🔄 Remettre en vente"
-BTN_ARCHIVE = "🗑️ Supprimer"
+BTN_ARCHIVE = "🗑️ Удалить"
 
 # Status change confirmations
 CONFIRM_MARK_RESERVED = "Marquer cette annonce comme réservée ?"
@@ -251,22 +251,22 @@ LISTING_EDITED_PRICE = "Prix mis à jour : {price} ₽"
 LISTING_EDITED_CONDITION = "État mis à jour : {condition}"
 LISTING_EDITED_PHONE = "Contact mis à jour : {phone}"
 LISTING_EDITED_DESCRIPTION = "Description mise à jour."
-LISTING_EDITED_PHOTOS = "Photos mises à jour."
+LISTING_EDITED_PHOTOS = "Фотографии обновлены."
 
 # Photo editing in listing management
-MANAGE_EDIT_PHOTOS_TITLE = "📸 Gestion des photos ({count}/{max})"
+MANAGE_EDIT_PHOTOS_TITLE = "📸 Управление фото ({count}/{max})"
 MANAGE_ADD_PHOTOS_PROMPT = (
     "📸 Ajoutez des photos ({count}/{max}).\n"
     "Envoyez vos photos ou cliquez sur « ✅ Terminé »."
 )
-MANAGE_DELETE_PHOTOS_PROMPT = "🗑️ Sélectionnez la photo à supprimer ({count}) :"
-MANAGE_PHOTO_DELETE_LABEL = "🗑️ Photo {number}"
-MANAGE_NO_PHOTOS_TO_DELETE = "Aucune photo à supprimer."
-MANAGE_PHOTOS_AT_MAX = "Maximum de {max} photos atteint."
+MANAGE_DELETE_PHOTOS_PROMPT = "🗑️ Выберите фото для удаления ({count}):"
+MANAGE_PHOTO_DELETE_LABEL = "🗑️ Фото {number}"
+MANAGE_NO_PHOTOS_TO_DELETE = "Нет фотографий для удаления."
+MANAGE_PHOTOS_AT_MAX = "Достигнут максимум {max} фото."
 
 # Listing management back buttons
-BTN_BACK_TO_LISTINGS = "⬅️ Retour à mes annonces"
-BTN_BACK_TO_MANAGE = "⬅️ Retour à la gestion"
+BTN_BACK_TO_LISTINGS = "⬅️ Назад à mes annonces"
+BTN_BACK_TO_MANAGE = "⬅️ Назад к управлению"
 
 # Listing selection
 SELECT_LISTING_PROMPT = "Sélectionnez une annonce à gérer :"
@@ -331,7 +331,7 @@ ADMIN_PANEL_TITLE = "⚙️ Administration"
 ADMIN_PANEL_CATALOG = "📚 Importer le catalogue"
 ADMIN_PANEL_YEARS = "📅 Années scolaires"
 ADMIN_PANEL_USERS = "👤 Gestion des utilisateurs"
-ADMIN_PANEL_BACK = "⬅️ Retour"
+ADMIN_PANEL_BACK = "⬅️ Назад"
 
 # Academic year management
 ADMIN_YEARS_TITLE = "📅 Années scolaires"
@@ -428,6 +428,6 @@ ADMIN_EXPIRY_NOTIFICATION = (
 )
 
 # Admin navigation
-ADMIN_BTN_BACK_PANEL = "⬅️ Retour au panneau"
-ADMIN_BTN_BACK_YEARS = "⬅️ Retour aux années"
-ADMIN_BTN_BACK_USERS = "⬅️ Retour aux utilisateurs"
+ADMIN_BTN_BACK_PANEL = "⬅️ Назад au panneau"
+ADMIN_BTN_BACK_YEARS = "⬅️ Назад aux années"
+ADMIN_BTN_BACK_USERS = "⬅️ Назад aux utilisateurs"

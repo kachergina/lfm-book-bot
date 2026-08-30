@@ -3,7 +3,7 @@
 import os
 from unittest.mock import patch
 
-from bot.config import Settings, get_settings
+from bot.config import Settings, get_settings, normalize_database_url
 
 
 class TestSettings:
@@ -44,6 +44,44 @@ class TestSettings:
             assert settings.is_production is True
             settings.environment = "development"
             assert settings.is_production is False
+
+
+class TestNormalizeDatabaseUrl:
+    """Tests for PostgreSQL URL normalization."""
+
+    def test_postgresql_scheme(self) -> None:
+        """postgresql:// is converted to postgresql+asyncpg://."""
+        assert (
+            normalize_database_url("postgresql://user:pass@host:5432/db")
+            == "postgresql+asyncpg://user:pass@host:5432/db"
+        )
+
+    def test_postgres_scheme(self) -> None:
+        """postgres:// is converted to postgresql+asyncpg://."""
+        assert (
+            normalize_database_url("postgres://user:pass@host:5432/db")
+            == "postgresql+asyncpg://user:pass@host:5432/db"
+        )
+
+    def test_asyncpg_url_unchanged(self) -> None:
+        """Already-async URLs are not modified."""
+        url = "postgresql+asyncpg://user:pass@host:5432/db"
+        assert normalize_database_url(url) == url
+
+    def test_sqlite_url_unchanged(self) -> None:
+        """SQLite development URLs are not modified."""
+        url = "sqlite+aiosqlite:///./data/bot.db"
+        assert normalize_database_url(url) == url
+
+    def test_settings_normalizes_render_postgres_url(self) -> None:
+        """Settings loads Render-style postgres:// URLs as asyncpg."""
+        env_vars = {
+            "TELEGRAM_BOT_TOKEN": "test-token",
+            "DATABASE_URL": "postgres://user:pass@host:5432/db",
+        }
+        with patch.dict(os.environ, env_vars, clear=False):
+            settings = Settings()
+            assert settings.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
 
 
 class TestGetSettings:

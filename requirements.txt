@@ -1,6 +1,7 @@
 # Production dependencies
 aiogram>=3.13.0
 sqlalchemy>=2.0.30
+asyncpg>=0.29.0
 aiosqlite>=0.20.0
 alembic>=1.13.0
 pydantic>=2.8.0

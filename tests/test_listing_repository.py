@@ -1,10 +1,13 @@
 """Tests for listing repository methods."""
 
+from datetime import timedelta
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.database.models import AcademicYear, Listing, User
 from bot.database.repository import BookRepository, ListingRepository, UserRepository
+from bot.utils.datetime_utils import utc_now
 
 
 @pytest.mark.asyncio
@@ -170,11 +173,13 @@ async def test_update_status(
     updated = await listing_repo.update_status(listing.id, "reserved")
     assert updated.status == "reserved"
     assert updated.reserved_at is not None
+    assert updated.reserved_at.tzinfo is None
 
     # Update to sold
     updated = await listing_repo.update_status(listing.id, "sold")
     assert updated.status == "sold"
     assert updated.sold_at is not None
+    assert updated.sold_at.tzinfo is None
 
     # Update non-existent listing
     not_found = await listing_repo.update_status(999, "archived")
@@ -289,3 +294,73 @@ async def test_count_active_by_user(
     # Count active listings for other user
     other_count = await listing_repo.count_active_by_user(other_user.id)
     assert other_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_expired_listings_with_naive_created_at(
+    db_session: AsyncSession,
+    academic_year: AcademicYear,
+    user: User,
+):
+    """Regression: naive PostgreSQL timestamps must compare with naive UTC cutoff."""
+    book_repo = BookRepository(db_session)
+    listing_repo = ListingRepository(db_session)
+
+    book = await book_repo.create(
+        category="textbook",
+        title="Math 6eme",
+        catalog_year_id=academic_year.id,
+    )
+    await db_session.commit()
+
+    listing = await listing_repo.create_listing(
+        book_id=book.id,
+        seller_id=user.id,
+        academic_year_id=academic_year.id,
+        price=15.00,
+        condition="good",
+        contact_phone="0612345678",
+    )
+    listing.created_at = utc_now() - timedelta(days=200)
+    assert listing.created_at.tzinfo is None
+    await db_session.commit()
+
+    expired = await listing_repo.get_expired_listings(expiry_days=180)
+    expired_ids = [item.id for item in expired]
+    assert listing.id in expired_ids
+
+
+@pytest.mark.asyncio
+async def test_bulk_expire_sets_naive_expires_at(
+    db_session: AsyncSession,
+    academic_year: AcademicYear,
+    user: User,
+):
+    """Regression: expires_at must be stored as naive UTC for PostgreSQL."""
+    book_repo = BookRepository(db_session)
+    listing_repo = ListingRepository(db_session)
+
+    book = await book_repo.create(
+        category="textbook",
+        title="Math 6eme",
+        catalog_year_id=academic_year.id,
+    )
+    await db_session.commit()
+
+    listing = await listing_repo.create_listing(
+        book_id=book.id,
+        seller_id=user.id,
+        academic_year_id=academic_year.id,
+        price=15.00,
+        condition="good",
+        contact_phone="0612345678",
+    )
+    await db_session.commit()
+
+    await listing_repo.bulk_expire([listing.id])
+    await db_session.refresh(listing)
+
+    assert listing.status == "expired"
+    assert listing.expires_at is not None
+    assert listing.expires_at.tzinfo is None
+

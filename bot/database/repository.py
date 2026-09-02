@@ -2,7 +2,7 @@
 
 import enum
 import unicodedata
-from datetime import UTC, date
+from datetime import date
 from typing import Any
 
 from sqlalchemy import distinct, func, select
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from bot.database.models import AcademicYear, Book, Listing, User
+from bot.utils.datetime_utils import utc_now
 
 
 class BookMatchResult(enum.Enum):
@@ -881,14 +882,12 @@ class ListingRepository:
         Returns:
             Updated listing if found, None otherwise.
         """
-        from datetime import datetime
-
         listing = await self.get_by_id(listing_id)
         if listing is None:
             return None
 
         listing.status = new_status
-        now = datetime.now(UTC)
+        now = utc_now()
 
         if new_status == "reserved":
             listing.reserved_at = now
@@ -977,8 +976,6 @@ class ListingRepository:
         Returns:
             Number of listings archived.
         """
-        from datetime import datetime
-
         result = await self.session.execute(
             select(Listing).where(
                 Listing.academic_year_id == academic_year_id,
@@ -986,7 +983,7 @@ class ListingRepository:
             ),
         )
         listings = result.scalars().all()
-        now = datetime.now(UTC)
+        now = utc_now()
         count = 0
         for listing in listings:
             listing.status = "archived"
@@ -1005,9 +1002,9 @@ class ListingRepository:
         Returns:
             List of expired listings with seller and book info.
         """
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
-        cutoff = datetime.now(UTC) - timedelta(days=expiry_days)
+        cutoff = utc_now() - timedelta(days=expiry_days)
         result = await self.session.execute(
             select(Listing)
             .options(selectinload(Listing.seller), selectinload(Listing.book))
@@ -1027,8 +1024,6 @@ class ListingRepository:
         Returns:
             Number of listings expired.
         """
-        from datetime import datetime
-
         if not listing_ids:
             return 0
 
@@ -1036,7 +1031,7 @@ class ListingRepository:
             select(Listing).where(Listing.id.in_(listing_ids)),
         )
         listings = result.scalars().all()
-        now = datetime.now(UTC)
+        now = utc_now()
         count = 0
         for listing in listings:
             if listing.status == "active":

@@ -1,6 +1,6 @@
 """Tests for Milestone 5: Academic Year & Admin."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,7 @@ from bot.database.repository import (
 from bot.services.academic_year import AcademicYearError, AcademicYearService
 from bot.services.admin import AdminError, AdminService
 from bot.services.listing import ListingService
+from bot.utils.datetime_utils import utc_now
 
 # ===== ACADEMIC YEAR REPOSITORY TESTS =====
 
@@ -475,7 +476,7 @@ class TestListingExpiry:
 
         # Manually set created_at to be old
 
-        old_date = datetime.now(UTC) - timedelta(days=200)
+        old_date = utc_now() - timedelta(days=200)
         listing.created_at = old_date
         await db_session.commit()
 
@@ -549,7 +550,7 @@ class TestListingExpiry:
 
         # Make it old
 
-        old_date = datetime.now(UTC) - timedelta(days=200)
+        old_date = utc_now() - timedelta(days=200)
         listing.created_at = old_date
         await db_session.commit()
 
@@ -590,7 +591,7 @@ class TestListingExpiry:
         # Mark as reserved
 
         listing.status = "reserved"
-        old_date = datetime.now(UTC) - timedelta(days=200)
+        old_date = utc_now() - timedelta(days=200)
         listing.created_at = old_date
         await db_session.commit()
 

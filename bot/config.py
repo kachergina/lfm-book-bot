@@ -4,8 +4,10 @@ import ssl
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from bot.constants import WEBHOOK_PATH
 
 # libpq query params passed through by SQLAlchemy but not supported by asyncpg
 _LIBPQ_QUERY_PARAMS = frozenset(
@@ -99,6 +101,11 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str
+    telegram_webhook_secret: str | None = None
+
+    # Render / webhook
+    port: int = 8000
+    render_external_url: str | None = None
 
     # Environment
     environment: str = "development"
@@ -123,10 +130,41 @@ class Settings(BaseSettings):
     max_listings_per_user: int = 50
     listing_expiry_days: int = 180
 
+    @field_validator("port", mode="before")
+    @classmethod
+    def _parse_port(cls, value: object) -> object:
+        if value is None or value == "":
+            return 8000
+        return value
+
+    @model_validator(mode="after")
+    def _validate_production_webhook(self) -> "Settings":
+        if self.is_production:
+            if not self.render_external_url:
+                msg = "RENDER_EXTERNAL_URL is required when ENVIRONMENT=production"
+                raise ValueError(msg)
+            if not self.telegram_webhook_secret:
+                msg = "TELEGRAM_WEBHOOK_SECRET is required when ENVIRONMENT=production"
+                raise ValueError(msg)
+        return self
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
         return self.environment == "production"
+
+    @property
+    def webhook_url(self) -> str:
+        """Full Telegram webhook URL derived from Render external URL."""
+        if not self.render_external_url:
+            msg = "RENDER_EXTERNAL_URL is not configured"
+            raise ValueError(msg)
+        return f"{self.render_external_url.rstrip('/')}{WEBHOOK_PATH}"
+
+    @property
+    def use_webhook(self) -> bool:
+        """Whether the bot should run in webhook mode."""
+        return self.is_production
 
 
 def get_settings() -> Settings:

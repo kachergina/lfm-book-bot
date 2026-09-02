@@ -1,23 +1,19 @@
 """Application entry point for the School Books Marketplace Bot."""
 
 import asyncio
+import contextlib
 import logging
+import signal
 import sys
 
 from aiogram import Bot, Dispatcher
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
+from aiohttp import web
 
-from bot.config import get_settings
+from bot.bootstrap import build_dispatcher, create_bot
+from bot.config import Settings, get_settings
 from bot.database import close_db, get_session, init_db, init_engine
-from bot.handlers import admin_router, catalog_router, listings_router, sell_router, start_router
-from bot.middlewares import (
-    BannedUserMiddleware,
-    BotMiddleware,
-    DatabaseSessionMiddleware,
-    ErrorHandlerMiddleware,
-)
 from bot.utils.helpers import format_price
+from bot.web.server import create_web_app
 
 EXPIRY_CHECK_INTERVAL_SECONDS = 3600  # Check every hour
 
@@ -150,52 +146,94 @@ async def on_shutdown() -> None:
     logger.info("Database connections closed")
 
 
+async def register_telegram_webhook(bot: Bot) -> None:
+    """Register Telegram webhook URL for production."""
+    settings = get_settings()
+    logger = logging.getLogger(__name__)
+    await bot.set_webhook(
+        url=settings.webhook_url,
+        secret_token=settings.telegram_webhook_secret,
+        drop_pending_updates=False,
+    )
+    logger.info("Telegram webhook registered at %s", settings.webhook_url)
+
+
+async def delete_telegram_webhook(bot: Bot) -> None:
+    """Remove Telegram webhook on shutdown."""
+    logger = logging.getLogger(__name__)
+    await bot.delete_webhook(drop_pending_updates=False)
+    logger.info("Telegram webhook removed")
+
+
+def configure_dispatcher(dp: Dispatcher, *, use_webhook: bool) -> None:
+    """Register lifecycle handlers on the dispatcher."""
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+    if use_webhook:
+        dp.startup.register(register_telegram_webhook)
+        dp.shutdown.register(delete_telegram_webhook)
+
+
+async def run_polling(bot: Bot, dp: Dispatcher) -> None:
+    """Run the bot in long-polling mode (local development)."""
+    logger = logging.getLogger(__name__)
+    logger.info("Bot starting polling...")
+    await dp.start_polling(bot)
+
+
+async def run_webhook(bot: Bot, dp: Dispatcher, settings: Settings) -> None:
+    """Run the bot behind an aiohttp webhook server (Render production)."""
+    logger = logging.getLogger(__name__)
+    app = create_web_app(
+        bot,
+        dp,
+        secret_token=settings.telegram_webhook_secret or "",
+    )
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=settings.port)
+    await site.start()
+    logger.info("Webhook server listening on 0.0.0.0:%s", settings.port)
+
+    stop_event = asyncio.Event()
+
+    def request_shutdown() -> None:
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig_name in ("SIGINT", "SIGTERM"):
+        sig = getattr(signal, sig_name, None)
+        if sig is not None:
+            with contextlib.suppress(NotImplementedError):
+                loop.add_signal_handler(sig, request_shutdown)
+
+    try:
+        await stop_event.wait()
+    finally:
+        await runner.cleanup()
+
+
 async def main() -> None:
     """Main entry point."""
     settings = get_settings()
     setup_logging(settings.log_level)
 
     logger = logging.getLogger(__name__)
-
-    # Create bot with default properties
-    bot = Bot(
-        token=settings.telegram_bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
-
-    # Create dispatcher
-    dp = Dispatcher()
-
-    # Include middlewares
-    dp.message.middleware(BotMiddleware(bot))
-    dp.message.middleware(DatabaseSessionMiddleware())
-    dp.message.middleware(BannedUserMiddleware())
-    dp.message.middleware(ErrorHandlerMiddleware())
-    dp.callback_query.middleware(BotMiddleware(bot))
-    dp.callback_query.middleware(DatabaseSessionMiddleware())
-    dp.callback_query.middleware(BannedUserMiddleware())
-    dp.callback_query.middleware(ErrorHandlerMiddleware())
-
-    # Include routers
-    dp.include_router(start_router)
-    dp.include_router(admin_router)
-    dp.include_router(catalog_router)
-    dp.include_router(sell_router)
-    dp.include_router(listings_router)
-
-    # Register startup/shutdown handlers
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
+    bot = create_bot(settings)
+    dp = build_dispatcher(bot)
+    configure_dispatcher(dp, use_webhook=settings.use_webhook)
 
     try:
-        # Start polling
-        logger.info("Bot starting polling...")
-        await dp.start_polling(bot)
+        if settings.use_webhook:
+            await run_webhook(bot, dp, settings)
+        else:
+            await run_polling(bot, dp)
     except Exception as e:
         logger.critical("Fatal error: %s", e)
         raise
     finally:
-        await bot.session.close()
+        if not settings.use_webhook:
+            await bot.session.close()
         logger.info("Bot stopped")
 
 

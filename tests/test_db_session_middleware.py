@@ -74,11 +74,11 @@ async def test_start_handler_receives_session(db_session):
             assert "2025-2026" in call_args[0][0]
 
 
-def test_middleware_registered_in_main():
-    """Test that DatabaseSessionMiddleware is registered in main.py."""
+def test_middleware_registered_in_bootstrap():
+    """Test that DatabaseSessionMiddleware is registered in bootstrap."""
     import inspect
 
-    from bot.main import main
+    from bot.bootstrap import build_dispatcher
 
-    source = inspect.getsource(main)
+    source = inspect.getsource(build_dispatcher)
     assert "DatabaseSessionMiddleware" in source

@@ -101,6 +101,7 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str
+    telegram_mode: str = "polling"
     telegram_webhook_secret: str | None = None
 
     # Render / webhook
@@ -130,6 +131,21 @@ class Settings(BaseSettings):
     max_listings_per_user: int = 50
     listing_expiry_days: int = 180
 
+    @field_validator("telegram_mode", mode="before")
+    @classmethod
+    def _normalize_telegram_mode(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.lower()
+        return value
+
+    @field_validator("telegram_mode")
+    @classmethod
+    def _validate_telegram_mode(cls, value: str) -> str:
+        if value not in {"polling", "webhook"}:
+            msg = "TELEGRAM_MODE must be 'polling' or 'webhook'"
+            raise ValueError(msg)
+        return value
+
     @field_validator("port", mode="before")
     @classmethod
     def _parse_port(cls, value: object) -> object:
@@ -138,13 +154,13 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _validate_production_webhook(self) -> "Settings":
-        if self.is_production:
+    def _validate_webhook_settings(self) -> "Settings":
+        if self.use_webhook:
             if not self.render_external_url:
-                msg = "RENDER_EXTERNAL_URL is required when ENVIRONMENT=production"
+                msg = "RENDER_EXTERNAL_URL is required when TELEGRAM_MODE=webhook"
                 raise ValueError(msg)
             if not self.telegram_webhook_secret:
-                msg = "TELEGRAM_WEBHOOK_SECRET is required when ENVIRONMENT=production"
+                msg = "TELEGRAM_WEBHOOK_SECRET is required when TELEGRAM_MODE=webhook"
                 raise ValueError(msg)
         return self
 
@@ -164,7 +180,7 @@ class Settings(BaseSettings):
     @property
     def use_webhook(self) -> bool:
         """Whether the bot should run in webhook mode."""
-        return self.is_production
+        return self.telegram_mode == "webhook"
 
 
 def get_settings() -> Settings:

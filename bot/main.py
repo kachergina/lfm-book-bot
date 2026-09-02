@@ -188,12 +188,13 @@ async def run_webhook(bot: Bot, dp: Dispatcher, settings: Settings) -> None:
         bot,
         dp,
         secret_token=settings.telegram_webhook_secret or "",
+        register_lifecycle=False,
     )
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=settings.port)
     await site.start()
-    logger.info("Webhook server listening on 0.0.0.0:%s", settings.port)
+    logger.info("HTTP server listening on 0.0.0.0:%s", settings.port)
 
     stop_event = asyncio.Event()
 
@@ -208,8 +209,11 @@ async def run_webhook(bot: Bot, dp: Dispatcher, settings: Settings) -> None:
                 loop.add_signal_handler(sig, request_shutdown)
 
     try:
+        await dp.emit_startup(bot=bot, app=app, dispatcher=dp)
+        logger.info("Application startup complete")
         await stop_event.wait()
     finally:
+        await dp.emit_shutdown(bot=bot, app=app, dispatcher=dp)
         await runner.cleanup()
 
 

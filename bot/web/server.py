@@ -17,8 +17,13 @@ def create_web_app(
     dp: Dispatcher,
     *,
     secret_token: str,
+    register_lifecycle: bool = True,
 ) -> web.Application:
-    """Build aiohttp application with health and Telegram webhook routes."""
+    """Build aiohttp application with health and Telegram webhook routes.
+
+    When ``register_lifecycle`` is False, caller must invoke ``dp.emit_startup``
+    after the HTTP server is listening so Render detects an open port first.
+    """
     app = web.Application()
     app.router.add_get("/health", health_handler)
 
@@ -28,5 +33,6 @@ def create_web_app(
         secret_token=secret_token,
     )
     webhook_handler.register(app, path=WEBHOOK_PATH)
-    setup_application(app, dp, bot=bot)
+    if register_lifecycle:
+        setup_application(app, dp, bot=bot)
     return app
